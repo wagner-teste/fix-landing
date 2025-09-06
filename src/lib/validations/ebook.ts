@@ -8,8 +8,7 @@ export const createCategorySchema = z.object({
     .max(100, "Nome deve ter no máximo 100 caracteres"),
   description: z.string()
     .max(500, "Descrição deve ter no máximo 500 caracteres")
-    .optional(),
-  status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE")
+    .optional()
 });
 
 // Schema para atualização de categoria
@@ -38,7 +37,6 @@ export const createEbookSchema = z.object({
   fileType: z.enum(["pdf", "epub", "mobi"])
 }).refine(
   (data) => {
-    // Se é premium, deve ter preço
     if (data.isPremium && (!data.price || data.price <= 0)) {
       return false;
     }
@@ -59,7 +57,6 @@ export const updateEbookSchema = createEbookSchema.partial().extend({
 export const ebookFiltersSchema = z.object({
   categoryId: z.string().optional(),
   isPremium: z.boolean().optional(),
-  isActive: z.boolean().optional(),
   search: z.string().max(100).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(10)
@@ -69,9 +66,3 @@ export const ebookFiltersSchema = z.object({
 export const idParamSchema = z.object({
   id: z.string().min(1, "ID é obrigatório")
 });
-
-export type CreateCategoryDTO = z.infer<typeof createCategorySchema>;
-export type UpdateCategoryDTO = z.infer<typeof updateCategorySchema>;
-export type CreateEbookDTO = z.infer<typeof createEbookSchema>;
-export type UpdateEbookDTO = z.infer<typeof updateEbookSchema>;
-export type EbookFiltersDTO = z.infer<typeof ebookFiltersSchema>;

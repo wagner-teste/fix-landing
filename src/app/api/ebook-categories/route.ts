@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/providers/prisma";
-import { withAdminAuth } from "@/lib/auth-middleware";
 import { createCategorySchema } from "@/lib/validations/ebook";
-import { ApiResponse, EbookCategory } from "@/types/api";
+import { ApiResponse, EbookCategory } from "@/types/ebook";
+import { z } from "zod";
 
 // GET /api/ebook-categories - Listar todas as categorias (público)
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const includeInactive = searchParams.get("includeInactive") === "true";
-
     const categories = await prisma.ebookCategory.findMany({
-      where: includeInactive ? {} : { status: "ACTIVE" },
       include: {
         _count: {
           select: {
@@ -48,63 +44,61 @@ export async function GET(request: NextRequest) {
 
 // POST /api/ebook-categories - Criar categoria (apenas admin)
 export async function POST(request: NextRequest) {
-  return withAdminAuth(request, async (req, user) => {
-    try {
-      const body = await req.json();
-      const validatedData = createCategorySchema.parse(body);
+  try {
+    const body = await request.json();
+    const validatedData = createCategorySchema.parse(body);
 
-      // Verificar se categoria já existe
-      const existingCategory = await prisma.ebookCategory.findUnique({
-        where: { name: validatedData.name }
-      });
+    // Verificar se categoria já existe
+    const existingCategory = await prisma.ebookCategory.findUnique({
+      where: { name: validatedData.name }
+    });
 
-      if (existingCategory) {
-        const response: ApiResponse = {
-          success: false,
-          data: null,
-          error: "Categoria com este nome já existe"
-        };
-        return NextResponse.json(response, { status: 400 });
-      }
-
-      const category = await prisma.ebookCategory.create({
-        data: validatedData,
-        include: {
-          _count: {
-            select: { ebooks: true }
-          }
-        }
-      });
-
-      const response: ApiResponse<EbookCategory> = {
-        success: true,
-        data: {
-          ...category,
-          createdAt: category.createdAt.toISOString(),
-          updatedAt: category.updatedAt.toISOString()
-        },
-        error: null
-      };
-
-      return NextResponse.json(response, { status: 201 });
-    } catch (error) {
-      console.error("Erro ao criar categoria:", error);
-      
-      if (error instanceof z.ZodError) {
-        const response: ApiResponse = {
-          success: false,
-          data: null,
-          error: error.errors[0].message
-        };
-        return NextResponse.json(response, { status: 400 });
-      }
-
+    if (existingCategory) {
       const response: ApiResponse = {
         success: false,
         data: null,
-        error: "Erro interno do servidor"
+        error: "Categoria com este nome já existe"
       };
-      return NextResponse.json(response, { status: 500 });
+      return NextResponse.json(response, { status: 400 });
     }
-  });
+
+    const category = await prisma.ebookCategory.create({
+      data: validatedData,
+      include: {
+        _count: {
+          select: { ebooks: true }
+        }
+      }
+    });
+
+    const response: ApiResponse<EbookCategory> = {
+      success: true,
+      data: {
+        ...category,
+        createdAt: category.createdAt.toISOString(),
+        updatedAt: category.updatedAt.toISOString()
+      },
+      error: null
+    };
+
+    return NextResponse.json(response, { status: 201 });
+  } catch (error) {
+    console.error("Erro ao criar categoria:", error);
+    
+    if (error instanceof z.ZodError) {
+      const response: ApiResponse = {
+        success: false,
+        data: null,
+        error: error.errors[0].message
+      };
+      return NextResponse.json(response, { status: 400 });
+    }
+
+    const response: ApiResponse = {
+      success: false,
+      data: null,
+      error: "Erro interno do servidor"
+    };
+    return NextResponse.json(response, { status: 500 });
+  }
 }
